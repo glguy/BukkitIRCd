@@ -1,6 +1,7 @@
 package com.Jdbye.BukkitIRCd;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -181,7 +182,11 @@ public class BukkitIRCdPlugin extends JavaPlugin {
 	// Set players to different IRC modes based on permission
 	for (final Player player : getServer().getOnlinePlayers()) {
 	    final String mode = computePlayerModes(player);
-	    BukkitUserManagement.addBukkitUser(mode, player);
+        final boolean isOper = player.hasPermission("bukkitircd.oper");
+        final String nick = player.getName();
+        final InetAddress playerAddress = player.getAddress().getAddress();
+        final String world = player.getWorld().getName();
+	    BukkitUserManagement.addBukkitUser(mode, nick, playerAddress, world, isOper);
 	}
 
 	thr = new Thread(ircd);

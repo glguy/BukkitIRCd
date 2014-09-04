@@ -16,6 +16,8 @@ import org.bukkit.event.server.ServerCommandEvent;
 import com.Jdbye.BukkitIRCd.configuration.Config;
 import org.bukkit.Bukkit;
 
+import java.net.InetAddress;
+
 /**
  Handle events for all Player related events
  <p>
@@ -116,16 +118,19 @@ public class BukkitIRCdPlayerListener implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerJoin(PlayerJoinEvent event) {
-	final Player player = event.getPlayer();
-	final String mode = plugin.computePlayerModes(player);
-	// TODO add ability to disable hosts and IP lookups altogether to minimise network traffic
-	BukkitUserManagement.addBukkitUser(mode, player);
-	/*Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, new Runnable() {
-	 @Override
-	 public void run() {
-                    
-	 }
-	 }, 20);*/
+        final Player player = event.getPlayer();
+        final String mode = plugin.computePlayerModes(player);
+        final boolean isOper = player.hasPermission("bukkitircd.oper");
+        final String nick = player.getName();
+        final InetAddress playerAddress = player.getAddress().getAddress();
+        final String world = player.getWorld().getName();
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
+            @Override
+            public void run() {
+                BukkitUserManagement.addBukkitUser(mode, nick, playerAddress, world, isOper);
+            }
+        });
     }
 
     /**

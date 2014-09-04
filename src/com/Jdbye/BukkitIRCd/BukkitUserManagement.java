@@ -324,99 +324,105 @@ public class BukkitUserManagement {
     @param player The player in question to be added
     @return Whether adding the player was successful
     */
-    public static boolean addBukkitUser(String modes, Player player) {
-	StringBuilder maskedrealhost = new StringBuilder();
-	String nick = player.getName();
-	String host = maskHost(player.getAddress().getAddress());
+    public static boolean addBukkitUser(final String modes, final String nick, final InetAddress playerAddress, final String world, final boolean isOper) {
 
-	// TODO This right here is the primary cause of login lag
-	//String realhost = player.getAddress().getAddress().getHostName();
-	// TODO This is a temporary solution
-	maskedrealhost.append("Masked-to-avoid-lag-" + host);
-	String realhost = maskedrealhost.toString();
+        // WARNING WARNING WARNING
+        // This method runs in an asychronous context! NO BUKKIT API CALLS
+        // WARNING WARNING WARNING
 
-	String ip = player.getAddress().getAddress().getHostAddress();
-	String world = player.getWorld().getName();
-	if (getUser(nick) < 0) {
-	    synchronized (csBukkitPlayers) {
-		BukkitPlayer bp = new BukkitPlayer(nick, world, modes,
-			realhost, host, ip, System.currentTimeMillis() / 1000L,	System.currentTimeMillis());
-		bukkitPlayers.add(bp);
-		if (mode == Modes.STANDALONE) {
-		    IRCFunctionality.writeAll(":" + nick + Config.getIrcdIngameSuffix() + "!" +
-			    nick + "@" + host + " JOIN " + Config.getIrcdChannel());
-		}
-		StringBuilder mode1 = new StringBuilder();
-		mode1.append("+");
-		if (modes.contains("~")) {
-		    mode1.append("q");
-		}
-		if (modes.contains("&")) {
-		    mode1.append("a");
-		}
-		if (modes.contains("@")) {
-		    mode1.append("o");
-		}
-		if (modes.contains("%")) {
-		    mode1.append("h");
-		}
-		if (modes.contains("+")) {
-		    mode1.append("v");
-		}
-		String mode2 = nick + Config.getIrcdIngameSuffix() + " ";
-		if (!mode1.equals("+")) {
-		    if (mode == Modes.STANDALONE) {
-			IRCFunctionality.writeAll(":" + Config.getIrcdServerName() + "!" +
-				Config.getIrcdServerName() + "@" +
-				Config.getIrcdServerHostName() + " MODE " +
-				Config.getIrcdChannel() + " " + mode1 + " " +
-				mode2.substring(0, mode2.length() - 1));
-		    }
-		}
+	    final String host = maskHost(playerAddress);
+	    final String realHost = playerAddress.getHostName();
+        final String ip = playerAddress.getHostAddress();
 
-		if (mode == Modes.INSPIRCD) {
-		    String UID = ugen.generateUID(Config.getLinkServerID());
-		    bp.setUID(UID);
-		    synchronized (csBukkitPlayers) {
-			final boolean isOper = bp
-				.hasPermission("bukkitircd.oper");
 
-			// Register new UID
-			final String userModes = isOper ? "+or" : "+r";
-			Utils.println(pre + "UID", UID,
-				Long.toString(bp.idleTime / 1000L), bp.nick +
-				Config.getIrcdIngameSuffix(),
-				bp.realhost, bp.host,
-				bp.nick, // user
-				bp.ip, Long.toString(bp.signedOn), userModes,
-				":Minecraft Player");
+        synchronized (csBukkitPlayers) {
+            if (getUser(nick) < 0) {
+                final BukkitPlayer bp = new BukkitPlayer(nick, world, modes,
+                        realHost, host, ip, System.currentTimeMillis() / 1000L, System.currentTimeMillis());
 
-			// Set oper type if appropriate
-			if (isOper) {
-			    Utils.println(":" + UID, "OPERTYPE", "IRC_Operator");
-			}
 
-			// Game client uses encrypted connection
-			Utils.println(pre + "METADATA", UID, "ssl_cert",
-				":vtrsE The peer did not send any certificate.");
+                final StringBuilder mode1 = new StringBuilder("+");
 
-			// Join in-game channel with modes set
-			Utils.println(pre + "FJOIN", Config.getIrcdChannel(),
-				Long.toString(channelTS), "+nt",
-				":" + bp.getTextMode() + "," + UID);
+                if (modes.contains("~")) {
+                    mode1.append("q");
+                }
+                if (modes.contains("&")) {
+                    mode1.append("a");
+                }
+                if (modes.contains("@")) {
+                    mode1.append("o");
+                }
+                if (modes.contains("%")) {
+                    mode1.append("h");
+                }
+                if (modes.contains("+")) {
+                    mode1.append("v");
+                }
 
-			// Send swhois field (extra metadata used for current world here)
-			final String worldString = world == null ? "an unknown world" :
-				world;
-			Utils.println(pre + "METADATA ", UID, "swhois",
-				":is currently in " + worldString);
-		    }
-		}
-		return true;
-	    }
-	} else {
-	    return false;
-	}
+                switch (mode) {
+                    case STANDALONE:
+                        IRCFunctionality.writeAll(":" + nick + Config.getIrcdIngameSuffix() + "!" +
+                                nick + "@" + host + " JOIN " + Config.getIrcdChannel());
+
+
+                        if (!mode1.equals("+")) {
+                            final String mode2 = nick + Config.getIrcdIngameSuffix() + " ";
+                            IRCFunctionality.writeAll(":" + Config.getIrcdServerName() + "!" +
+                                    Config.getIrcdServerName() + "@" +
+                                    Config.getIrcdServerHostName() + " MODE " +
+                                    Config.getIrcdChannel() + " " + mode1 + " " +
+                                    mode2.substring(0, mode2.length() - 1));
+                        }
+
+                        break;
+
+                    case INSPIRCD:
+                        final String UID = ugen.generateUID(Config.getLinkServerID());
+                        bp.setUID(UID);
+
+
+                        // Register new UID
+                        final String userModes = isOper ? "+or" : "+r";
+                        Utils.println(pre + "UID", UID,
+                                Long.toString(bp.idleTime / 1000L), bp.nick +
+                                        Config.getIrcdIngameSuffix(),
+                                bp.realhost, bp.host,
+                                bp.nick, // user
+                                bp.ip, Long.toString(bp.signedOn), userModes,
+                                ":Minecraft Player");
+
+                        // Set oper type if appropriate
+                        if (isOper) {
+                            Utils.println(":" + UID, "OPERTYPE", "IRC_Operator");
+                        }
+
+                        // Game client uses encrypted connection
+                        Utils.println(pre + "METADATA", UID, "ssl_cert",
+                                ":vtrsE The peer did not send any certificate.");
+
+                        // Join in-game channel with modes set
+                        Utils.println(pre + "FJOIN", Config.getIrcdChannel(),
+                                Long.toString(channelTS), "+nt",
+                                ":" + bp.getTextMode() + "," + UID);
+
+                        // Send swhois field (extra metadata used for current world here)
+                        final String worldString = world == null ? "an unknown world" :
+                                world;
+                        Utils.println(pre + "METADATA ", UID, "swhois",
+                                ":is currently in " + worldString);
+
+                        break;
+                }
+
+                // Don't add the player to the list until successfully announcing
+                // the join to the rest of the network/clients
+                bukkitPlayers.add(bp);
+
+                return true;
+            } else {
+                return false;
+            }
+        }
     }
 
     /**
